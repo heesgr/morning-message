@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Morning Message" />
+  <title>Morning Message</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fdf6ee;
+      color: #3b2a1a;
+      min-height: 100vh;
+      padding: 20px 16px 40px;
+    }
+
+    header {
+      text-align: center;
+      padding: 16px 0 24px;
+    }
+
+    header .cross { font-size: 32px; margin-bottom: 6px; }
+
+    header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #5c3d1e;
+      line-height: 1.2;
+    }
+
+    header p {
+      font-size: 15px;
+      color: #8a6a4a;
+      margin-top: 4px;
+    }
+
+    section {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    label {
+      display: block;
+      font-size: 15px;
+      font-weight: 600;
+      color: #5c3d1e;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      font-size: 18px;
+      padding: 14px 16px;
+      border: 2px solid #ddc9b0;
+      border-radius: 12px;
+      background: #fdf6ee;
+      color: #3b2a1a;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="text"]:focus, input[type="password"]:focus {
+      border-color: #a0683a;
+    }
+
+    .theme-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .theme-row input {
+      flex: 1;
+    }
+
+    button {
+      -webkit-appearance: none;
+      appearance: none;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: inherit;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    button:active { opacity: 0.8; transform: scale(0.97); }
+
+    .btn-random {
+      background: #e8d5bb;
+      color: #5c3d1e;
+      font-size: 15px;
+      padding: 14px 16px;
+      white-space: nowrap;
+    }
+
+    .btn-generate {
+      width: 100%;
+      background: #7a4520;
+      color: #fff;
+      font-size: 20px;
+      padding: 18px;
+      border-radius: 14px;
+      letter-spacing: 0.3px;
+    }
+
+    .btn-generate:disabled {
+      background: #c4a882;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-copy {
+      width: 100%;
+      background: #e8f5e9;
+      color: #2e6b34;
+      font-size: 18px;
+      padding: 16px;
+      border: 2px solid #a5d6a7;
+      margin-top: 12px;
+    }
+
+    .btn-copy.copied {
+      background: #c8e6c9;
+    }
+
+    #output {
+      font-size: 17px;
+      line-height: 1.7;
+      color: #2c1e0f;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    #output.placeholder {
+      color: #b09070;
+      font-style: italic;
+    }
+
+    .spinner {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+      font-size: 15px;
+      color: #8a6a4a;
+    }
+
+    .spinner.visible { display: block; }
+
+    .spinner::before {
+      content: '';
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #ddc9b0;
+      border-top-color: #7a4520;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .api-toggle {
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .api-toggle button {
+      background: none;
+      color: #a0683a;
+      font-size: 13px;
+      padding: 4px 8px;
+      text-decoration: underline;
+      font-weight: 400;
+    }
+
+    #api-section { display: none; }
+    #api-section.visible { display: block; }
+
+    .hint {
+      font-size: 13px;
+      color: #8a6a4a;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="cross">✝️</div>
+  <h1>Morning Message</h1>
+  <p>A daily blessing for the family</p>
+</header>
+
+<!-- Theme -->
+<section>
+  <label for="theme">Today's Theme</label>
+  <div class="theme-row">
+    <input type="text" id="theme" placeholder="e.g. strength, hope, peace…" autocomplete="off" autocorrect="off" />
+    <button class="btn-random" onclick="pickRandom()">🎲 Random</button>
+  </div>
+</section>
+
+<!-- Generate -->
+<button class="btn-generate" id="generate-btn" onclick="generate()">
+  ✨ Generate Message
+</button>
+
+<!-- Output -->
+<section style="margin-top:16px;">
+  <div id="spinner" class="spinner">Creating your message…</div>
+  <div id="output" class="placeholder">Your morning message will appear here.</div>
+  <button class="btn-copy" id="copy-btn" onclick="copyMessage()" style="display:none;">
+    📋 Copy Message
+  </button>
+</section>
+
+<!-- API Key (collapsed by default) -->
+<div class="api-toggle">
+  <button onclick="toggleApi()">⚙️ API Key Settings</button>
+</div>
+<section id="api-section">
+  <label for="apikey">Claude API Key</label>
+  <input type="password" id="apikey" placeholder="sk-ant-…" autocomplete="off" autocorrect="off" autocapitalize="off" />
+  <p class="hint">Saved on this device only. Get one at console.anthropic.com</p>
+  <button onclick="saveKey()" style="margin-top:10px; background:#7a4520; color:#fff; font-size:15px; padding:12px 20px;">Save Key</button>
+</section>
+
+<script>
+  const THEMES = [
+    "faith","hope","love","peace","joy","strength","perseverance","grace",
+    "gratitude","forgiveness","courage","trust","patience","mercy","renewal",
+    "comfort","wisdom","humility","abundance","praise","protection","healing",
+    "steadfastness","light","salvation"
+  ];
+
+  function pickRandom() {
+    const t = THEMES[Math.floor(Math.random() * THEMES.length)];
+    document.getElementById('theme').value = t;
+  }
+
+  function toggleApi() {
+    const s = document.getElementById('api-section');
+    s.classList.toggle('visible');
+    if (s.classList.contains('visible')) {
+      const saved = localStorage.getItem('claude_api_key') || '';
+      document.getElementById('apikey').value = saved;
+    }
+  }
+
+  function saveKey() {
+    const key = document.getElementById('apikey').value.trim();
+    if (key) {
+      localStorage.setItem('claude_api_key', key);
+      alert('API key saved! ✓');
+      document.getElementById('api-section').classList.remove('visible');
+    }
+  }
+
+  async function generate() {
+    const apiKey = localStorage.getItem('claude_api_key') || '';
+    if (!apiKey) {
+      alert('Please tap ⚙️ API Key Settings and enter your Claude API key first.');
+      return;
+    }
+
+    const rawTheme = document.getElementById('theme').value.trim();
+    const theme = rawTheme || THEMES[Math.floor(Math.random() * THEMES.length)];
+    if (!rawTheme) document.getElementById('theme').value = theme;
+
+    const btn = document.getElementById('generate-btn');
+    const spinner = document.getElementById('spinner');
+    const output = document.getElementById('output');
+    const copyBtn = document.getElementById('copy-btn');
+
+    btn.disabled = true;
+    spinner.classList.add('visible');
+    output.className = 'placeholder';
+    output.textContent = '';
+    copyBtn.style.display = 'none';
+
+    const prompt = `You are helping an 88-year-old Christian grandmother create her daily morning text message to her family.
+
+Theme for today: "${theme}"
+
+Write a warm, heartfelt morning message that includes:
+1. A short greeting line (just a few words, like "Good morning, family! 🌅")
+2. One Bible verse that fits the theme — quote it in full, then the reference in parentheses
+3. A blank line
+4. One classic Christian hymn or worship song that fits the theme — give the title and one short memorable verse or chorus (just 2–4 lines of lyrics)
+5. A blank line
+6. This exact closing (copy it word for word, do not change it):
+Have a blessed and wonderful Jesus filled day today everyone!! lul Mom/Omi
+
+Keep the whole message to about 12–14 lines total. Use simple, warm language. No bullet points, no headers — just flowing text with blank lines between sections. Do not add any commentary, introduction, or explanation outside the message itself.`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const text = data.content?.[0]?.text || '';
+
+      output.className = '';
+      output.textContent = text.trim();
+      copyBtn.style.display = 'block';
+      copyBtn.textContent = '📋 Copy Message';
+      copyBtn.classList.remove('copied');
+
+    } catch (e) {
+      output.className = '';
+      output.textContent = '❌ Something went wrong:\n' + e.message;
+    }
+
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+  }
+
+  async function copyMessage() {
+    const text = document.getElementById('output').textContent;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // iOS fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Copy Message';
+      btn.classList.remove('copied');
+    }, 2500);
+  }
+</script>
+
+</body>
+</html>

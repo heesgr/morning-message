@@ -266,6 +266,51 @@
     }
   }
 
+  const HISTORY_LIMIT = 10;
+  const HISTORY_KEY = 'morning_message_history';
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || {}; }
+    catch { return {}; }
+  }
+
+  function saveHistory(history) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }
+
+  function getThemeHistory(theme) {
+    const history = loadHistory();
+    const key = theme.toLowerCase().trim();
+    return history[key] || { verses: [], songs: [] };
+  }
+
+  function recordUsage(theme, verse, song) {
+    const history = loadHistory();
+    const key = theme.toLowerCase().trim();
+    if (!history[key]) history[key] = { verses: [], songs: [] };
+    const entry = history[key];
+    if (verse) {
+      entry.verses = [verse, ...entry.verses.filter(v => v !== verse)].slice(0, HISTORY_LIMIT);
+    }
+    if (song) {
+      entry.songs = [song, ...entry.songs.filter(s => s !== song)].slice(0, HISTORY_LIMIT);
+    }
+    saveHistory(history);
+  }
+
+  function extractVerseAndSong(text) {
+    // Extract Bible verse reference like "Psalm 46:1" or "John 3:16"
+    const verseMatch = text.match(/\(([1-3]?\s?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s+\d+:\d+(?:[-–]\d+)?)\)/);
+    const verse = verseMatch ? verseMatch[1].trim() : null;
+
+    // Extract hymn/song title — look for a line that's likely a song title
+    // Songs are usually on their own line, often quoted or followed by lyrics
+    const songMatch = text.match(/(?:^|\n)"([^"]{5,60})"|(?:^|\n)((?:[A-Z][a-zA-Z']+\s){1,6}[A-Z][a-zA-Z']+)(?=\n)/m);
+    const song = songMatch ? (songMatch[1] || songMatch[2]).trim() : null;
+
+    return { verse, song };
+  }
+
   async function generate() {
     const apiKey = localStorage.getItem('claude_api_key') || '';
     if (!apiKey) {
@@ -288,15 +333,28 @@
     output.textContent = '';
     copyBtn.style.display = 'none';
 
+    const themeHistory = getThemeHistory(theme);
+    let avoidSection = '';
+    if (themeHistory.verses.length > 0 || themeHistory.songs.length > 0) {
+      avoidSection = '\n\nIMPORTANT — to keep things fresh, do NOT use any of these previously used items:';
+      if (themeHistory.verses.length > 0) {
+        avoidSection += `\nBible verses already used: ${themeHistory.verses.join(', ')}`;
+      }
+      if (themeHistory.songs.length > 0) {
+        avoidSection += `\nHymns/songs already used: ${themeHistory.songs.join(', ')}`;
+      }
+      avoidSection += '\nChoose a different verse and a different song.';
+    }
+
     const prompt = `You are helping an 88-year-old Christian grandmother create her daily morning text message to her family.
 
-Theme for today: "${theme}"
+Theme for today: "${theme}"${avoidSection}
 
 Write a warm, heartfelt morning message that includes:
 1. A short greeting line (just a few words, like "Good morning, family! 🌅")
 2. One Bible verse that fits the theme — quote it in full, then the reference in parentheses
 3. A blank line
-4. One classic Christian hymn or worship song that fits the theme — give the title and one short memorable verse or chorus (just 2–4 lines of lyrics)
+4. The phrase "and our song is" followed by the hymn/worship song title, then one short memorable verse or chorus (just 2–4 lines of lyrics)
 5. A blank line
 6. This exact closing (copy it word for word, do not change it):
 Have a blessed and wonderful Jesus filled day today everyone!! lul Mom/Omi
@@ -332,6 +390,9 @@ Keep the whole message to about 12–14 lines total. Use simple, warm language. 
       copyBtn.style.display = 'block';
       copyBtn.textContent = '📋 Copy Message';
       copyBtn.classList.remove('copied');
+
+      const { verse, song } = extractVerseAndSong(text);
+      recordUsage(theme, verse, song);
 
     } catch (e) {
       output.className = '';

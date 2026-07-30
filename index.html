@@ -299,14 +299,12 @@
   }
 
   function extractVerseAndSong(text) {
-    // Extract Bible verse reference like "Psalm 46:1" or "John 3:16"
     const verseMatch = text.match(/\(([1-3]?\s?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s+\d+:\d+(?:[-–]\d+)?)\)/);
     const verse = verseMatch ? verseMatch[1].trim() : null;
 
-    // Extract hymn/song title — look for a line that's likely a song title
-    // Songs are usually on their own line, often quoted or followed by lyrics
-    const songMatch = text.match(/(?:^|\n)"([^"]{5,60})"|(?:^|\n)((?:[A-Z][a-zA-Z']+\s){1,6}[A-Z][a-zA-Z']+)(?=\n)/m);
-    const song = songMatch ? (songMatch[1] || songMatch[2]).trim() : null;
+    // Match "and our song is <Title>" pattern
+    const songMatch = text.match(/and our song is\s+(.+)/i);
+    const song = songMatch ? songMatch[1].trim() : null;
 
     return { verse, song };
   }
@@ -349,6 +347,9 @@
     const prompt = `You are helping an 88-year-old Christian grandmother create her daily morning text message to her family.
 
 Theme for today: "${theme}"${avoidSection}
+
+Draw the song from this broad list of classic hymns and worship songs (do NOT always default to the most famous ones — rotate widely across this list):
+A Mighty Fortress Is Our God, Abide With Me, All Creatures of Our God and King, All Hail the Power of Jesus' Name, All the Way My Savior Leads Me, Amazing Grace, And Can It Be, Are You Washed in the Blood, At Calvary, At the Cross, Beneath the Cross of Jesus, Blessed Assurance, Blest Be the Tie That Binds, Built on the Rock, Christ the Lord Is Risen Today, Come Thou Almighty King, Come Thou Fount of Every Blessing, Come Ye Sinners Poor and Needy, Come Ye Thankful People Come, Crown Him with Many Crowns, Day by Day, Dear Lord and Father of Mankind, Does Jesus Care, Doxology, Eternal Father Strong to Save, Face to Face, Fairest Lord Jesus, Faith of Our Fathers, For the Beauty of the Earth, Give Me Jesus, Glorious Things of Thee Are Spoken, God of Grace and God of Glory, God of Our Fathers, Good Good Father, Grace Greater Than Our Sin, Great Is Thy Faithfulness, Guide Me O Thou Great Jehovah, Hallelujah What a Savior, He Hideth My Soul, He Is Lord, He Keeps Me Singing, His Eye Is on the Sparrow, Holy Holy Holy, How Deep the Father's Love for Us, How Firm a Foundation, How Great Is Our God, How Great Thou Art, I Am Thine O Lord, I Come to the Garden Alone, I Know That My Redeemer Lives, I Know Whom I Have Believed, I Love to Tell the Story, I Need Thee Every Hour, I Sing the Mighty Power of God, I Surrender All, I Will Sing of My Redeemer, Immortal Invisible God Only Wise, In Christ Alone, It Is Well with My Soul, I've Got Peace Like a River, Jesus Is All the World to Me, Jesus Keep Me Near the Cross, Jesus Loves Me, Jesus Paid It All, Jesus Shall Reign, Joyful Joyful We Adore Thee, Just a Closer Walk with Thee, Just As I Am, Lead On O King Eternal, Leaning on the Everlasting Arms, Let Us Break Bread Together, Lord I Want to Be a Christian, Love Divine All Loves Excelling, Love Lifted Me, My Faith Has Found a Resting Place, My Faith Looks Up to Thee, My Hope Is Built on Nothing Less, My Jesus I Love Thee, Near the Cross, Near to the Heart of God, No Not One, Nothing But the Blood, Now Thank We All Our God, O For a Thousand Tongues to Sing, O God Our Help in Ages Past, O How I Love Jesus, O Little Town of Bethlehem, O Lord My God, O Sacred Head Now Wounded, O Worship the King, On Jordan's Stormy Banks, Once to Every Man and Nation, Only Trust Him, Open My Eyes That I May See, Praise God from Whom All Blessings Flow, Praise Him Praise Him, Praise to the Lord the Almighty, Redeemed How I Love to Proclaim It, Rescue the Perishing, Revive Us Again, Rock of Ages, Savior Like a Shepherd Lead Us, Send the Light, Since Jesus Came Into My Heart, Softly and Tenderly, Spirit of God Descend Upon My Heart, Stand Up Stand Up for Jesus, Standing on the Promises, Sweet Hour of Prayer, Take My Life and Let It Be, Take the Name of Jesus with You, Tell Me the Old Old Story, Tell Me the Story of Jesus, The Battle Hymn of the Republic, The Church's One Foundation, The Solid Rock, The Unclouded Day, There Is a Fountain, There Is Power in the Blood, There Shall Be Showers of Blessing, This Is My Father's World, To God Be the Glory, Trust and Obey, Turn Your Eyes Upon Jesus, Under His Wings, Victory in Jesus, We Gather Together, Were You There, What a Fellowship, What a Friend We Have in Jesus, When I Survey the Wondrous Cross, When Morning Gilds the Skies, When Peace Like a River, When the Roll Is Called Up Yonder, When We All Get to Heaven, Whiter Than Snow, Wonderful Grace of Jesus, Wonderful Words of Life, Work for the Night Is Coming
 
 Write a warm, heartfelt morning message that includes:
 1. A short greeting line (just a few words, like "Good morning, family! 🌅")

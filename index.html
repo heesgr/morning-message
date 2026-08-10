@@ -298,12 +298,31 @@
     saveHistory(history);
   }
 
+  // Verified direct links, keyed by lowercased hymn title. Filled in over time —
+  // anything not listed here falls back to a YouTube search link.
+  const HYMN_LINKS = {};
+
+  function getSongLink(song) {
+    if (!song) return null;
+    const key = song.toLowerCase().replace(/[.!?]+$/, '').trim();
+    return HYMN_LINKS[key] || `https://www.youtube.com/results?search_query=${encodeURIComponent(song + ' hymn')}`;
+  }
+
+  function insertSongLink(text, url) {
+    if (!url) return text;
+    const paragraphs = text.split(/\n\s*\n/);
+    const idx = paragraphs.findIndex(p => /and our song is/i.test(p));
+    if (idx === -1) return text;
+    paragraphs.splice(idx + 1, 0, `🎵 Listen: ${url}`);
+    return paragraphs.join('\n\n');
+  }
+
   function extractVerseAndSong(text) {
     const verseMatch = text.match(/\(([1-3]?\s?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s+\d+:\d+(?:[-–]\d+)?)\)/);
     const verse = verseMatch ? verseMatch[1].trim() : null;
 
-    // Match "and our song is <Title>" pattern
-    const songMatch = text.match(/and our song is\s+(.+)/i);
+    // Match "And our song is:" followed by the title on the next line
+    const songMatch = text.match(/and our song is:?\s*\n+\s*(.+)/i);
     const song = songMatch ? songMatch[1].trim() : null;
 
     return { verse, song };
@@ -356,7 +375,7 @@ Write a warm, heartfelt morning message that includes:
 2. One Bible verse that fits the theme — quote it in full, then the reference in parentheses
 3. A short devotional paragraph (2–3 warm, encouraging sentences) reflecting on the verse and how it applies to daily life
 4. A blank line
-5. The exact phrase "and our song is" on its own line, immediately followed by the hymn/worship song title (example: "and our song is Amazing Grace"), then one short memorable verse or chorus (just 2–4 lines of lyrics) on the next line
+5. The exact phrase "And our song is:" on its own line (capital A, colon at the end, nothing else on that line), then the hymn/worship song title on the next line by itself (example: "Amazing Grace"), then one short memorable verse or chorus (just 2–4 lines of lyrics) on the line(s) after that
 6. A blank line
 7. This exact closing (copy it word for word, do not change it):
 Have a blessed and wonderful Jesus filled day today everyone!! lul Mom/Omi
@@ -391,14 +410,16 @@ Keep the whole message to about 16–20 lines total. Use simple, warm language. 
       if (text.trim().length < 200) text = await callApi();
       if (text.trim().length < 200) text = await callApi();
 
+      const { verse, song } = extractVerseAndSong(text);
+      recordUsage(theme, verse, song);
+
+      const finalText = insertSongLink(text.trim(), getSongLink(song));
+
       output.className = '';
-      output.textContent = text.trim();
+      output.textContent = finalText;
       copyBtn.style.display = 'block';
       copyBtn.textContent = '📋 Copy Message';
       copyBtn.classList.remove('copied');
-
-      const { verse, song } = extractVerseAndSong(text);
-      recordUsage(theme, verse, song);
 
     } catch (e) {
       output.className = '';

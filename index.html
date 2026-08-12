@@ -521,7 +521,9 @@ Write a warm, heartfelt morning message that includes:
 7. This exact closing (copy it word for word, do not change it):
 Have a blessed and wonderful Jesus filled day today everyone!! lul Mom/Omi
 
-Keep the whole message to about 16–20 lines total. Use simple, warm language. No bullet points, no headers — just flowing text with blank lines between sections. Do not add any commentary, introduction, or explanation outside the message itself.`;
+Keep the whole message to about 16–20 lines total. Use simple, warm language. No bullet points, no headers — just flowing text with blank lines between sections.
+
+Decide on your final verse and song silently before writing. Output ONLY that single final message, word for word as it should be sent — nothing else. Do not show any drafts, alternate attempts, self-corrections, or reasoning about your choices. Never include phrases like "wait," "let me try again," "hmm," or "here's another option" — if you reconsider partway through, discard it and restart silently, so only the one finished message appears in your response.`;
 
     try {
       const callApi = async () => {
@@ -547,9 +549,15 @@ Keep the whole message to about 16–20 lines total. Use simple, warm language. 
         return data.content?.[0]?.text || '';
       };
 
+      const isBad = (t) => {
+        const trimmed = t.trim();
+        if (trimmed.length < 200) return true;
+        return /\b(wait[,.—-]|let me try|hmm+[,.]|here'?s another|let me (share|use)|actually,? let me|on second thought)\b/i.test(trimmed);
+      };
+
       let text = await callApi();
-      if (text.trim().length < 200) text = await callApi();
-      if (text.trim().length < 200) text = await callApi();
+      if (isBad(text)) text = await callApi();
+      if (isBad(text)) text = await callApi();
 
       const { verse, song } = extractVerseAndSong(text);
       recordUsage(theme, verse, song);

@@ -458,6 +458,42 @@
     return paragraphs.join('\n\n');
   }
 
+  // Last-resort cleanup for when the model narrates its own reconsideration
+  // into the output (e.g. "Wait — that verse was already used. Let me use a
+  // different one.") despite the prompt and retry logic. Cuts everything up
+  // through the last such aside, keeping only what comes after — re-attaching
+  // the opening greeting if the cut point swallowed it.
+  function cleanupSelfCorrection(text) {
+    const startTriggerRe = /^(["'“‘]{0,2}\s*)(wait\s*[,.:—-]|let me (try|share|use)|hmm+[,.]|here'?s another|actually,? let me|on second thought|scratch that|i'?ll (try|use) (a|another))/i;
+    const stripLeadRe = /^(["'“‘]{0,2})[\s\S]*?\b(wait|hmm+|let me[^.!?]*|actually,? let me[^.!?]*|on second thought|scratch that|i'?ll (try|use) (a|another)[^.!?]*)\b[^.!?]*[.!?]\s*/i;
+    const hasRealContent = (s) => /["“]/.test(s) || /\(\s*[1-3]?\s?[A-Za-z]+\.?\s+\d+:\d+/.test(s);
+    const isGreeting = (s) => s.length < 60 && !hasRealContent(s) && !startTriggerRe.test(s);
+
+    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 0 && !/^-{2,}$/.test(p));
+    if (paragraphs.length === 0) return text;
+
+    let lastBadIdx = -1;
+    paragraphs.forEach((p, i) => { if (startTriggerRe.test(p)) lastBadIdx = i; });
+    if (lastBadIdx === -1) return paragraphs.join('\n\n');
+
+    let cleaned = paragraphs[lastBadIdx];
+    for (let i = 0; i < 3; i++) {
+      const before = cleaned;
+      cleaned = cleaned.replace(stripLeadRe, '$1').trim();
+      if (cleaned === before) break;
+    }
+
+    const rest = paragraphs.slice(lastBadIdx + 1);
+    let finalParagraphs = hasRealContent(cleaned) ? [cleaned, ...rest] : rest;
+
+    const originalGreeting = paragraphs[0];
+    if (isGreeting(originalGreeting) && (finalParagraphs.length === 0 || !isGreeting(finalParagraphs[0]))) {
+      finalParagraphs = [originalGreeting, ...finalParagraphs];
+    }
+
+    return finalParagraphs.join('\n\n').trim();
+  }
+
   function extractVerseAndSong(text) {
     const verseMatch = text.match(/\(([1-3]?\s?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s+\d+:\d+(?:[-–]\d+)?)\)/);
     const verse = verseMatch ? verseMatch[1].trim() : null;
@@ -552,17 +588,20 @@ Decide on your final verse and song silently before writing. Output ONLY that si
       const isBad = (t) => {
         const trimmed = t.trim();
         if (trimmed.length < 200) return true;
-        return /\b(wait[,.—-]|let me try|hmm+[,.]|here'?s another|let me (share|use)|actually,? let me|on second thought)\b/i.test(trimmed);
+        return /\b(wait\s*[,.:—-]|let me try|hmm+[,.]|here'?s another|let me (share|use)|actually,? let me|on second thought|scratch that)\b/i.test(trimmed);
       };
 
       let text = await callApi();
       if (isBad(text)) text = await callApi();
       if (isBad(text)) text = await callApi();
+      if (isBad(text)) text = await callApi();
 
-      const { verse, song } = extractVerseAndSong(text);
+      const cleanedText = cleanupSelfCorrection(text.trim());
+
+      const { verse, song } = extractVerseAndSong(cleanedText);
       recordUsage(theme, verse, song);
 
-      const finalText = insertSongLink(text.trim(), getSongLink(song));
+      const finalText = insertSongLink(cleanedText, getSongLink(song));
 
       output.className = '';
       output.textContent = finalText;

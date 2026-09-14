@@ -428,31 +428,66 @@
 
   // Last-resort cleanup for when the model narrates its own reconsideration
   // into the output (e.g. "Wait — that verse was already used. Let me use a
-  // different one.") despite the prompt and retry logic. Cuts everything up
-  // through the last such aside, keeping only what comes after — re-attaching
+  // different one.") despite the prompt and retry logic. Primarily structural
+  // (multiple Bible-verse references means multiple attempts happened) rather
+  // than phrase-matching, since the model phrases this differently every time
+  // ("Wait —", "Hmm,", "Oh wait, I must choose...", etc.) and pure phrase
+  // matching kept missing new wordings. Cuts everything through the
+  // second-to-last attempt, keeping only the real final message — re-attaching
   // the opening greeting if the cut point swallowed it.
   function cleanupSelfCorrection(text) {
-    const startTriggerRe = /^(["'“‘]{0,2}\s*)(wait\s*[,.:—-]|let me (try|share|use)|hmm+[,.]|here'?s another|actually,? let me|on second thought|scratch that|i'?ll (try|use) (a|another))/i;
-    const stripLeadRe = /^(["'“‘]{0,2})[\s\S]*?\b(wait|hmm+|let me[^.!?]*|actually,? let me[^.!?]*|on second thought|scratch that|i'?ll (try|use) (a|another)[^.!?]*)\b[^.!?]*[.!?]\s*/i;
-    const hasRealContent = (s) => /["“]/.test(s) || /\(\s*[1-3]?\s?[A-Za-z]+\.?\s+\d+:\d+/.test(s);
-    const isGreeting = (s) => s.length < 60 && !hasRealContent(s) && !startTriggerRe.test(s);
+    const verseRefRe = /\([1-3]?\s?[A-Za-z]+\.?\s+\d+:\d+(?:[-–]\d+)?\)/;
+    const selfCorrectionRe = /\bwait\s?[,.:—-]|\blet\s*me\s*(?:try|share|use|choose|reconsider)\b|\bhmm+[,.]?\b|\bhere'?s another\b|\bactually,?\s*let\s*me\b|\bon second thought\b|\bscratch that\b|\bi\s*must\s*choose\b|\bi'?ll\s*(?:try|use)\s*(?:a|another)\b/i;
+    const stripLeadRe = /^(["'“‘]{0,2})[\s\S]*?\b(wait|hmm+|let\s*me[^.!?]*|actually,?\s*let\s*me[^.!?]*|on second thought|scratch that|i\s*must\s*choose[^.!?]*|i'?ll\s*(?:try|use)\s*(?:a|another)[^.!?]*)\b[^.!?]*[.!?]\s*/i;
+    const hasRealContent = (s) => /["“]/.test(s) || verseRefRe.test(s);
+    const isGreeting = (s) => s.length < 60 && !hasRealContent(s) && !selfCorrectionRe.test(s);
+    const clean = (s) => {
+      let c = s;
+      for (let i = 0; i < 3; i++) {
+        const before = c;
+        c = c.replace(stripLeadRe, '$1').trim();
+        if (c === before) break;
+      }
+      return c;
+    };
 
     const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 0 && !/^-{2,}$/.test(p));
     if (paragraphs.length === 0) return text;
 
-    let lastBadIdx = -1;
-    paragraphs.forEach((p, i) => { if (startTriggerRe.test(p)) lastBadIdx = i; });
-    if (lastBadIdx === -1) return paragraphs.join('\n\n');
+    const verseParaIdxs = [];
+    paragraphs.forEach((p, i) => { if (verseRefRe.test(p)) verseParaIdxs.push(i); });
+    const finalVerseIdx = verseParaIdxs.length > 0 ? verseParaIdxs[verseParaIdxs.length - 1] : -1;
 
-    let cleaned = paragraphs[lastBadIdx];
-    for (let i = 0; i < 3; i++) {
-      const before = cleaned;
-      cleaned = cleaned.replace(stripLeadRe, '$1').trim();
-      if (cleaned === before) break;
+    // Structural signal: more than one verse attempt means everything
+    // through the second-to-last one is an abandoned draft.
+    let lastBadIdx = verseParaIdxs.length > 1 ? verseParaIdxs[verseParaIdxs.length - 2] : -1;
+
+    // Extend through any self-correction asides sitting between that point
+    // and the real final verse — but never past the final verse itself.
+    const scanLimit = finalVerseIdx === -1 ? paragraphs.length : finalVerseIdx;
+    paragraphs.forEach((p, i) => {
+      if (i > lastBadIdx && i < scanLimit && selfCorrectionRe.test(p)) lastBadIdx = i;
+    });
+
+    // No verse-count signal at all (e.g. only the song was reconsidered):
+    // fall back to pure phrase matching.
+    if (lastBadIdx === -1) {
+      paragraphs.forEach((p, i) => { if (selfCorrectionRe.test(p)) lastBadIdx = i; });
     }
 
+    if (lastBadIdx === -1) return paragraphs.join('\n\n');
+
+    const cleanedBoundary = clean(paragraphs[lastBadIdx]);
     const rest = paragraphs.slice(lastBadIdx + 1);
-    let finalParagraphs = hasRealContent(cleaned) ? [cleaned, ...rest] : rest;
+
+    // The real final verse can itself be fused with leading self-correction
+    // text ("Wait, I will try again. Be of good courage...").
+    if (rest.length > 0 && selfCorrectionRe.test(rest[0])) {
+      const cleanedFirst = clean(rest[0]);
+      if (hasRealContent(cleanedFirst)) rest[0] = cleanedFirst;
+    }
+
+    let finalParagraphs = hasRealContent(cleanedBoundary) ? [cleanedBoundary, ...rest] : rest;
 
     const originalGreeting = paragraphs[0];
     if (isGreeting(originalGreeting) && (finalParagraphs.length === 0 || !isGreeting(finalParagraphs[0]))) {
@@ -543,7 +578,9 @@ Decide on your final verse and song silently before writing. Output ONLY that si
       const isBad = (t) => {
         const trimmed = t.trim();
         if (trimmed.length < 200) return true;
-        return /\b(wait\s*[,.:—-]|let me try|hmm+[,.]|here'?s another|let me (share|use)|actually,? let me|on second thought|scratch that)\b/i.test(trimmed);
+        const verseCount = (trimmed.match(/\([1-3]?\s?[A-Za-z]+\.?\s+\d+:\d+(?:[-–]\d+)?\)/g) || []).length;
+        if (verseCount > 1) return true;
+        return /\bwait\s?[,.:—-]|\blet\s*me\s*(?:try|share|use|choose|reconsider)\b|\bhmm+[,.]?\b|\bhere'?s another\b|\bactually,?\s*let\s*me\b|\bon second thought\b|\bscratch that\b|\bi\s*must\s*choose\b/i.test(trimmed);
       };
 
       let text = await callApi();
